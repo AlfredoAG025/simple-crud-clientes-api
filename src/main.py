@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import datetime
@@ -7,13 +8,13 @@ import string
 from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import motor.motor_asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
 from . import config
 
 client = AsyncIOMotorClient(config.DB_URI)
+client.get_io_loop = asyncio.get_event_loop
 database = client[str(config.DB_NAME)]
 collection = database.clientes
 
@@ -50,7 +51,6 @@ app = FastAPI(
 
 origins = [
     config.FRONTEND_URL,
-    'http://localhost:5173'
 ]
 
 app.add_middleware(
@@ -60,6 +60,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print('server Shutdown :', datetime.datetime.now())
+    client.close()
+
+
+@app.get('/', tags=['index'])
+async def index():
+    return "Bienvenido a esta simple API CRUD de clientes ✌"
 
 
 @app.get('/clientes', tags=['clientes'], response_model=list[Cliente])
@@ -108,3 +119,7 @@ async def delete_cliente(id: str):
     return {
         "message": "cliente eliminado!",
     }
+
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
